@@ -126,6 +126,10 @@ async function getAIResponse(prompt: string): Promise<Array<{
   try {
     const response = await openai.chat.completions.create({
       ...queryConfig,
+      // return JSON if the model supports it:
+      ...(OPENAI_API_MODEL === "gpt-4-1106-preview"
+        ? { response_format: { type: "json_object" } }
+        : {}),
       messages: [
         {
           role: "system",
@@ -133,9 +137,6 @@ async function getAIResponse(prompt: string): Promise<Array<{
         },
       ],
     });
-
-    // Log the raw response for debugging
-    console.log('Raw response:', response);
 
     const res = response.choices[0].message?.content?.trim() || "{}";
     return JSON.parse(res).reviews;
