@@ -135,7 +135,7 @@ ${chunk.changes
 `;
 }
 function getAIResponse(prompt) {
-    var _a, _b;
+    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         const queryConfig = {
             model: OPENAI_API_MODEL,
@@ -154,14 +154,20 @@ function getAIResponse(prompt) {
                 ] }));
             // Log the raw response for debugging
             console.log('Raw response:', JSON.stringify(response, null, 2));
-            const res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "{}";
+            const res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "";
+            // Extract JSON content from Markdown code block
+            const jsonContent = (_c = res.match(/```json([\s\S]*)```/)) === null || _c === void 0 ? void 0 : _c[1];
+            if (!jsonContent) {
+                console.error("Failed to extract JSON content from response.");
+                return null;
+            }
             // Attempt to parse JSON
             try {
-                return JSON.parse(res).reviews;
+                return JSON.parse(jsonContent).reviews;
             }
             catch (e) {
                 console.error("Failed to parse JSON:", e);
-                console.error("Response content:", res);
+                console.error("Response content:", jsonContent);
                 return null;
             }
         }

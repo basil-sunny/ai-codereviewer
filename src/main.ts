@@ -137,14 +137,22 @@ async function getAIResponse(prompt: string): Promise<Array<{
     // Log the raw response for debugging
     console.log('Raw response:', JSON.stringify(response, null, 2));
 
-    const res = response.choices[0].message?.content?.trim() || "{}";
+    const res = response.choices[0].message?.content?.trim() || "";
+    
+    // Extract JSON content from Markdown code block
+    const jsonContent = res.match(/```json([\s\S]*)```/)?.[1];
+
+    if (!jsonContent) {
+      console.error("Failed to extract JSON content from response.");
+      return null;
+    }
 
     // Attempt to parse JSON
     try {
-      return JSON.parse(res).reviews;
+      return JSON.parse(jsonContent).reviews;
     } catch (e) {
       console.error("Failed to parse JSON:", e);
-      console.error("Response content:", res);
+      console.error("Response content:", jsonContent);
       return null;
     }
   } catch (error) {
