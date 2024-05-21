@@ -52,7 +52,6 @@ async function getDiff(
     pull_number,
     mediaType: { format: "diff" },
   });
-  // @ts-expect-error - response.data is a string
   return response.data;
 }
 
@@ -79,17 +78,17 @@ async function analyzeCode(
 }
 
 function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
+  const newAndModifiedLines = chunk.changes.filter(change => change.add || (change.normal && change.content.trim() !== ""));
+  
   return `Your task is to review pull requests. Instructions:
-- Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
+- Provide the response in the following JSON format: {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
 - Use the given description only for the overall context and only comment the code.
 - IMPORTANT: NEVER suggest adding comments to the code.
 
-Review the following code diff in the file "${
-    file.to
-  }" and take the pull request title and description into account when writing the response.
+Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
   
 Pull request title: ${prDetails.title}
 Pull request description:
@@ -102,9 +101,8 @@ Git diff to review:
 
 \`\`\`diff
 ${chunk.content}
-${chunk.changes
-  // @ts-expect-error - ln and ln2 exists where needed
-  .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
+${newAndModifiedLines
+  .map((c) => `${c.add ? '+' : ''} ${c.ln ? c.ln : c.ln2} ${c.content}`)
   .join("\n")}
 \`\`\`
 `;
@@ -135,10 +133,18 @@ async function getAIResponse(prompt: string): Promise<Array<{
     });
 
     // Log the raw response for debugging
-    console.log('Raw response:', response);
+    console.log('Raw response:', JSON.stringify(response, null, 2));
 
     const res = response.choices[0].message?.content?.trim() || "{}";
-    return JSON.parse(res).reviews;
+
+    // Attempt to parse JSON
+    try {
+      return JSON.parse(res).reviews;
+    } catch (e) {
+      console.error("Failed to parse JSON:", e);
+      console.error("Response content:", res);
+      return null;
+    }
   } catch (error) {
     console.error("Error:", error);
     return null;
