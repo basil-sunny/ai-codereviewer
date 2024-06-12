@@ -8,7 +8,7 @@ import minimatch from "minimatch";
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
-const FRAMEWORK: string = core.getInput("framework"); // New input for framework
+const FRAMEWORK: string = core.getInput("framework");
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -469,12 +469,21 @@ async function createReviewComment(
     pull_number: number,
     comments: Array<{ body: string; path: string; line: number }>
 ): Promise<void> {
+  const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
+
+  if (validComments.length === 0) {
+    console.log("No valid comments to add");
+    return;
+  }
+
   await octokit.pulls.createReview({
     owner,
     repo,
     pull_number,
-    comments,
+    comments: validComments,
     event: "COMMENT",
+  }).catch(error => {
+    console.error("Error creating review comment:", error);
   });
 }
 
