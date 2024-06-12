@@ -384,7 +384,7 @@ ${chunk.changes
 `;
 }
 function getAIResponse(prompt) {
-    var _a, _b, _c;
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         const queryConfig = {
             model: OPENAI_API_MODEL,
@@ -404,8 +404,16 @@ function getAIResponse(prompt) {
             // Log the raw response for debugging
             console.log('Raw response:', JSON.stringify(response, null, 2));
             const res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "";
-            // Extract JSON content from Markdown code block
-            const jsonContent = (_c = res.match(/```json([\s\S]*)```/)) === null || _c === void 0 ? void 0 : _c[1];
+            let jsonContent = null;
+            // Check if the response is in a code block
+            const codeBlockMatch = res.match(/```json([\s\S]*)```/);
+            if (codeBlockMatch) {
+                jsonContent = codeBlockMatch[1];
+            }
+            else {
+                // If not, assume the response is direct JSON
+                jsonContent = res;
+            }
             if (!jsonContent) {
                 console.error("Failed to extract JSON content from response.");
                 return null;
