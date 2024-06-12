@@ -80,8 +80,8 @@ async function analyzeCode(
     parsedDiff: File[],
     prDetails: PRDetails,
     existingComments: Array<{ path: string; line: number; body: string }>
-): Promise<Array<{ body: string; path: string; line: number }>> {
-  const comments: Array<{ body: string; path: string; line: number }> = [];
+): Promise<Array<{ body: string; path: string; line: number; diff_hunk: string }>> {
+  const comments: Array<{ body: string; path: string; line: number; diff_hunk: string }> = [];
 
   // Log the parsed diff for debugging
   console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2));
@@ -440,7 +440,7 @@ function createComment(
       lineNumber: string;
       reviewComment: string;
     }>
-): Array<{ body: string; path: string; line: number }> {
+): Array<{ body: string; path: string; line: number; diff_hunk: string }> {
   return aiResponses.flatMap((aiResponse) => {
     if (!file.to) {
       return [];
@@ -461,11 +461,13 @@ function createComment(
     }
 
     const commentLine = "ln" in change ? change.ln : "ln2" in change ? change.ln2 : 0;
+    const diff_hunk = chunk.content + "\n" + chunk.changes.map(c => `${c.type === 'add' ? '+' : c.type === 'del' ? '-' : ' '} ${c.content}`).join("\n");
 
     return {
       body: aiResponse.reviewComment,
       path: file.to,
       line: commentLine,
+      diff_hunk: diff_hunk.trim(),
     };
   });
 }
@@ -474,7 +476,7 @@ async function createReviewComment(
     owner: string,
     repo: string,
     pull_number: number,
-    comments: Array<{ body: string; path: string; line: number }>,
+    comments: Array<{ body: string; path: string; line: number; diff_hunk: string }>,
     commit_id: string
 ): Promise<void> {
   const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
@@ -497,6 +499,9 @@ async function createReviewComment(
         line: comment.line,
         side: 'RIGHT', // Ensure the comment is on the right side of the diff
         commit_id, // Include commit_id in the request
+        start_line: comment.line,
+        start_side: 'RIGHT',
+        diff_hunk: comment.diff_hunk, // Include diff_hunk in the request
       });
     } catch (error) {
       console.error("Error creating review comment:", error);
