@@ -105,6 +105,8 @@ function getExistingComments(owner, repo, pull_number) {
 function analyzeCode(parsedDiff, prDetails, existingComments) {
     return __awaiter(this, void 0, void 0, function* () {
         const comments = [];
+        // Log the parsed diff for debugging
+        console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2));
         for (const file of parsedDiff) {
             if (file.to === "/dev/null")
                 continue; // Ignore deleted files
@@ -526,6 +528,7 @@ function main() {
             return;
         }
         const parsedDiff = (0, parse_diff_1.default)(diff);
+        console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2)); // Log parsed diff for debugging
         const excludePatterns = core
             .getInput("exclude")
             .split(",")

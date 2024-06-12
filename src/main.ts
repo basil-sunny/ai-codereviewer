@@ -83,6 +83,9 @@ async function analyzeCode(
 ): Promise<Array<{ body: string; path: string; line: number }>> {
   const comments: Array<{ body: string; path: string; line: number }> = [];
 
+  // Log the parsed diff for debugging
+  console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2));
+
   for (const file of parsedDiff) {
     if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
@@ -541,6 +544,8 @@ async function main() {
   }
 
   const parsedDiff = parseDiff(diff);
+
+  console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2)); // Log parsed diff for debugging
 
   const excludePatterns = core
       .getInput("exclude")
