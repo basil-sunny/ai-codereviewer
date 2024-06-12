@@ -396,8 +396,16 @@ async function getAIResponse(prompt: string): Promise<Array<{
 
     const res = response.choices[0].message?.content?.trim() || "";
 
-    // Extract JSON content from Markdown code block
-    const jsonContent = res.match(/```json([\s\S]*)```/)?.[1];
+    let jsonContent: string | null = null;
+
+    // Check if the response is in a code block
+    const codeBlockMatch = res.match(/```json([\s\S]*)```/);
+    if (codeBlockMatch) {
+      jsonContent = codeBlockMatch[1];
+    } else {
+      // If not, assume the response is direct JSON
+      jsonContent = res;
+    }
 
     if (!jsonContent) {
       console.error("Failed to extract JSON content from response.");
