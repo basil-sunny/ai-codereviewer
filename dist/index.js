@@ -460,10 +460,12 @@ function createComment(file, chunk, aiResponses) {
             return [];
         }
         const commentLine = "ln" in change ? change.ln : "ln2" in change ? change.ln2 : 0;
+        const diff_hunk = chunk.content + "\n" + chunk.changes.map(c => `${c.type === 'add' ? '+' : c.type === 'del' ? '-' : ' '} ${c.content}`).join("\n");
         return {
             body: aiResponse.reviewComment,
             path: file.to,
             line: commentLine,
+            diff_hunk: diff_hunk.trim(),
         };
     });
 }
@@ -485,7 +487,10 @@ function createReviewComment(owner, repo, pull_number, comments, commit_id) {
                     path: comment.path,
                     line: comment.line,
                     side: 'RIGHT',
-                    commit_id, // Include commit_id in the request
+                    commit_id,
+                    start_line: comment.line,
+                    start_side: 'RIGHT',
+                    diff_hunk: comment.diff_hunk, // Include diff_hunk in the request
                 });
             }
             catch (error) {
