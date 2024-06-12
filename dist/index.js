@@ -467,7 +467,7 @@ function createComment(file, chunk, aiResponses) {
         };
     });
 }
-function createReviewComment(owner, repo, pull_number, comments) {
+function createReviewComment(owner, repo, pull_number, comments, commit_id) {
     return __awaiter(this, void 0, void 0, function* () {
         const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
         if (validComments.length === 0) {
@@ -475,24 +475,29 @@ function createReviewComment(owner, repo, pull_number, comments) {
             return;
         }
         console.log("Attempting to create review comments:", JSON.stringify(validComments, null, 2));
-        try {
-            yield octokit.pulls.createReview({
-                owner,
-                repo,
-                pull_number,
-                comments: validComments,
-                event: "COMMENT",
-            });
-        }
-        catch (error) {
-            console.error("Error creating review comment:", error);
-            console.log("Request data:", {
-                owner,
-                repo,
-                pull_number,
-                comments: validComments,
-                event: "COMMENT",
-            });
+        for (const comment of validComments) {
+            try {
+                yield octokit.pulls.createReviewComment({
+                    owner,
+                    repo,
+                    pull_number,
+                    body: comment.body,
+                    path: comment.path,
+                    line: comment.line,
+                    side: 'RIGHT',
+                    commit_id, // Include commit_id in the request
+                });
+            }
+            catch (error) {
+                console.error("Error creating review comment:", error);
+                console.log("Request data:", {
+                    owner,
+                    repo,
+                    pull_number,
+                    comment,
+                    commit_id,
+                });
+            }
         }
     });
 }
@@ -502,8 +507,10 @@ function main() {
         const prDetails = yield getPRDetails();
         let diff;
         const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
+        let commit_id;
         if (eventData.action === "opened") {
             diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
+            commit_id = eventData.pull_request.head.sha;
         }
         else if (eventData.action === "synchronize") {
             const newBaseSha = eventData.before;
@@ -518,6 +525,7 @@ function main() {
                 head: newHeadSha,
             });
             diff = String(response.data);
+            commit_id = newHeadSha;
         }
         else {
             console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
@@ -539,7 +547,8 @@ function main() {
         const existingComments = yield getExistingComments(prDetails.owner, prDetails.repo, prDetails.pull_number);
         const comments = yield analyzeCode(filteredDiff, prDetails, existingComments);
         if (comments.length > 0) {
-            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
+            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments, commit_id // Pass commit_id to the function
+            );
         }
     });
 }

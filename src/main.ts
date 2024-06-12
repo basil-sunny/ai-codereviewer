@@ -474,7 +474,8 @@ async function createReviewComment(
     owner: string,
     repo: string,
     pull_number: number,
-    comments: Array<{ body: string; path: string; line: number }>
+    comments: Array<{ body: string; path: string; line: number }>,
+    commit_id: string
 ): Promise<void> {
   const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
 
@@ -485,23 +486,28 @@ async function createReviewComment(
 
   console.log("Attempting to create review comments:", JSON.stringify(validComments, null, 2));
 
-  try {
-    await octokit.pulls.createReview({
-      owner,
-      repo,
-      pull_number,
-      comments: validComments,
-      event: "COMMENT",
-    });
-  } catch (error) {
-    console.error("Error creating review comment:", error);
-    console.log("Request data:", {
-      owner,
-      repo,
-      pull_number,
-      comments: validComments,
-      event: "COMMENT",
-    });
+  for (const comment of validComments) {
+    try {
+      await octokit.pulls.createReviewComment({
+        owner,
+        repo,
+        pull_number,
+        body: comment.body,
+        path: comment.path,
+        line: comment.line,
+        side: 'RIGHT', // Ensure the comment is on the right side of the diff
+        commit_id, // Include commit_id in the request
+      });
+    } catch (error) {
+      console.error("Error creating review comment:", error);
+      console.log("Request data:", {
+        owner,
+        repo,
+        pull_number,
+        comment,
+        commit_id,
+      });
+    }
   }
 }
 
@@ -512,12 +518,15 @@ async function main() {
       readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
   );
 
+  let commit_id: string;
+
   if (eventData.action === "opened") {
     diff = await getDiff(
         prDetails.owner,
         prDetails.repo,
         prDetails.pull_number
     );
+    commit_id = eventData.pull_request.head.sha;
   } else if (eventData.action === "synchronize") {
     const newBaseSha = eventData.before;
     const newHeadSha = eventData.after;
@@ -533,6 +542,7 @@ async function main() {
     });
 
     diff = String(response.data);
+    commit_id = newHeadSha;
   } else {
     console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
     return;
@@ -570,7 +580,8 @@ async function main() {
         prDetails.owner,
         prDetails.repo,
         prDetails.pull_number,
-        comments
+        comments,
+        commit_id // Pass commit_id to the function
     );
   }
 }
