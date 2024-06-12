@@ -57,34 +57,11 @@ async function getDiff(
   return response.data;
 }
 
-async function getExistingComments(
-    owner: string,
-    repo: string,
-    pull_number: number
-): Promise<Array<{ path: string; line: number; body: string }>> {
-  const commentsResponse = await octokit.pulls.listReviewComments({
-    owner,
-    repo,
-    pull_number,
-  });
-  return commentsResponse.data
-      .filter(comment => comment.line !== undefined)
-      .map(comment => ({
-        path: comment.path,
-        line: comment.line!,
-        body: comment.body,
-      }));
-}
-
 async function analyzeCode(
     parsedDiff: File[],
-    prDetails: PRDetails,
-    existingComments: Array<{ path: string; line: number; body: string }>
-): Promise<Array<{ body: string; path: string; line: number; diff_hunk: string }>> {
-  const comments: Array<{ body: string; path: string; line: number; diff_hunk: string }> = [];
-
-  // Log the parsed diff for debugging
-  console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2));
+    prDetails: PRDetails
+): Promise<Array<{ body: string; path: string; line: number }>> {
+  const comments: Array<{ body: string; path: string; line: number }> = [];
 
   for (const file of parsedDiff) {
     if (file.to === "/dev/null") continue; // Ignore deleted files
@@ -93,24 +70,12 @@ async function analyzeCode(
       const aiResponse = await getAIResponse(prompt);
       if (aiResponse) {
         const newComments = createComment(file, chunk, aiResponse);
-        for (const comment of newComments) {
-          console.log("Processing comment:", comment);
-          const duplicate = existingComments.some(
-              existingComment =>
-                  existingComment.path === comment.path &&
-                  existingComment.line === comment.line &&
-                  existingComment.body.trim() === comment.body.trim()
-          );
-          if (!duplicate) {
-            comments.push(comment);
-          } else {
-            console.log("Duplicate comment found, skipping:", comment);
-          }
+        if (newComments) {
+          comments.push(...newComments);
         }
       }
     }
   }
-  console.log("Final comments to add:", JSON.stringify(comments, null, 2));
   return comments;
 }
 
@@ -440,7 +405,7 @@ function createComment(
       lineNumber: string;
       reviewComment: string;
     }>
-): Array<{ body: string; path: string; line: number; diff_hunk: string }> {
+): Array<{ body: string; path: string; line: number }> {
   return aiResponses.flatMap((aiResponse) => {
     if (!file.to) {
       return [];
@@ -461,13 +426,11 @@ function createComment(
     }
 
     const commentLine = "ln" in change ? change.ln : "ln2" in change ? change.ln2 : 0;
-    const diff_hunk = chunk.content + "\n" + chunk.changes.map(c => `${c.type === 'add' ? '+' : c.type === 'del' ? '-' : ' '} ${c.content}`).join("\n");
 
     return {
       body: aiResponse.reviewComment,
       path: file.to,
       line: commentLine,
-      diff_hunk: diff_hunk.trim(),
     };
   });
 }
@@ -476,8 +439,7 @@ async function createReviewComment(
     owner: string,
     repo: string,
     pull_number: number,
-    comments: Array<{ body: string; path: string; line: number; diff_hunk: string }>,
-    commit_id: string
+    comments: Array<{ body: string; path: string; line: number }>
 ): Promise<void> {
   const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
 
@@ -490,18 +452,14 @@ async function createReviewComment(
 
   for (const comment of validComments) {
     try {
-      await octokit.pulls.createReviewComment({
+      await octokit.pulls.createReview({
         owner,
         repo,
         pull_number,
         body: comment.body,
         path: comment.path,
         line: comment.line,
-        side: 'RIGHT', // Ensure the comment is on the right side of the diff
-        commit_id, // Include commit_id in the request
-        start_line: comment.line,
-        start_side: 'RIGHT',
-        diff_hunk: comment.diff_hunk, // Include diff_hunk in the request
+        event: 'COMMENT',
       });
     } catch (error) {
       console.error("Error creating review comment:", error);
@@ -510,7 +468,6 @@ async function createReviewComment(
         repo,
         pull_number,
         comment,
-        commit_id,
       });
     }
   }
@@ -523,15 +480,12 @@ async function main() {
       readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
   );
 
-  let commit_id: string;
-
   if (eventData.action === "opened") {
     diff = await getDiff(
         prDetails.owner,
         prDetails.repo,
         prDetails.pull_number
     );
-    commit_id = eventData.pull_request.head.sha;
   } else if (eventData.action === "synchronize") {
     const newBaseSha = eventData.before;
     const newHeadSha = eventData.after;
@@ -547,7 +501,6 @@ async function main() {
     });
 
     diff = String(response.data);
-    commit_id = newHeadSha;
   } else {
     console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
     return;
@@ -573,20 +526,13 @@ async function main() {
     );
   });
 
-  const existingComments = await getExistingComments(
-      prDetails.owner,
-      prDetails.repo,
-      prDetails.pull_number
-  );
-
-  const comments = await analyzeCode(filteredDiff, prDetails, existingComments);
+  const comments = await analyzeCode(filteredDiff, prDetails);
   if (comments.length > 0) {
     await createReviewComment(
         prDetails.owner,
         prDetails.repo,
         prDetails.pull_number,
-        comments,
-        commit_id // Pass commit_id to the function
+        comments
     );
   }
 }

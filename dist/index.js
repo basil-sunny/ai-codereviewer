@@ -86,27 +86,9 @@ function getDiff(owner, repo, pull_number) {
         return response.data;
     });
 }
-function getExistingComments(owner, repo, pull_number) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const commentsResponse = yield octokit.pulls.listReviewComments({
-            owner,
-            repo,
-            pull_number,
-        });
-        return commentsResponse.data
-            .filter(comment => comment.line !== undefined)
-            .map(comment => ({
-            path: comment.path,
-            line: comment.line,
-            body: comment.body,
-        }));
-    });
-}
-function analyzeCode(parsedDiff, prDetails, existingComments) {
+function analyzeCode(parsedDiff, prDetails) {
     return __awaiter(this, void 0, void 0, function* () {
         const comments = [];
-        // Log the parsed diff for debugging
-        console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2));
         for (const file of parsedDiff) {
             if (file.to === "/dev/null")
                 continue; // Ignore deleted files
@@ -115,22 +97,12 @@ function analyzeCode(parsedDiff, prDetails, existingComments) {
                 const aiResponse = yield getAIResponse(prompt);
                 if (aiResponse) {
                     const newComments = createComment(file, chunk, aiResponse);
-                    for (const comment of newComments) {
-                        console.log("Processing comment:", comment);
-                        const duplicate = existingComments.some(existingComment => existingComment.path === comment.path &&
-                            existingComment.line === comment.line &&
-                            existingComment.body.trim() === comment.body.trim());
-                        if (!duplicate) {
-                            comments.push(comment);
-                        }
-                        else {
-                            console.log("Duplicate comment found, skipping:", comment);
-                        }
+                    if (newComments) {
+                        comments.push(...newComments);
                     }
                 }
             }
         }
-        console.log("Final comments to add:", JSON.stringify(comments, null, 2));
         return comments;
     });
 }
@@ -460,16 +432,14 @@ function createComment(file, chunk, aiResponses) {
             return [];
         }
         const commentLine = "ln" in change ? change.ln : "ln2" in change ? change.ln2 : 0;
-        const diff_hunk = chunk.content + "\n" + chunk.changes.map(c => `${c.type === 'add' ? '+' : c.type === 'del' ? '-' : ' '} ${c.content}`).join("\n");
         return {
             body: aiResponse.reviewComment,
             path: file.to,
             line: commentLine,
-            diff_hunk: diff_hunk.trim(),
         };
     });
 }
-function createReviewComment(owner, repo, pull_number, comments, commit_id) {
+function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
         const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
         if (validComments.length === 0) {
@@ -479,18 +449,14 @@ function createReviewComment(owner, repo, pull_number, comments, commit_id) {
         console.log("Attempting to create review comments:", JSON.stringify(validComments, null, 2));
         for (const comment of validComments) {
             try {
-                yield octokit.pulls.createReviewComment({
+                yield octokit.pulls.createReview({
                     owner,
                     repo,
                     pull_number,
                     body: comment.body,
                     path: comment.path,
                     line: comment.line,
-                    side: 'RIGHT',
-                    commit_id,
-                    start_line: comment.line,
-                    start_side: 'RIGHT',
-                    diff_hunk: comment.diff_hunk, // Include diff_hunk in the request
+                    event: 'COMMENT',
                 });
             }
             catch (error) {
@@ -500,7 +466,6 @@ function createReviewComment(owner, repo, pull_number, comments, commit_id) {
                     repo,
                     pull_number,
                     comment,
-                    commit_id,
                 });
             }
         }
@@ -512,10 +477,8 @@ function main() {
         const prDetails = yield getPRDetails();
         let diff;
         const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
-        let commit_id;
         if (eventData.action === "opened") {
             diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
-            commit_id = eventData.pull_request.head.sha;
         }
         else if (eventData.action === "synchronize") {
             const newBaseSha = eventData.before;
@@ -530,7 +493,6 @@ function main() {
                 head: newHeadSha,
             });
             diff = String(response.data);
-            commit_id = newHeadSha;
         }
         else {
             console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
@@ -549,11 +511,9 @@ function main() {
         const filteredDiff = parsedDiff.filter((file) => {
             return !excludePatterns.some((pattern) => { var _a; return (0, minimatch_1.default)((_a = file.to) !== null && _a !== void 0 ? _a : "", pattern); });
         });
-        const existingComments = yield getExistingComments(prDetails.owner, prDetails.repo, prDetails.pull_number);
-        const comments = yield analyzeCode(filteredDiff, prDetails, existingComments);
+        const comments = yield analyzeCode(filteredDiff, prDetails);
         if (comments.length > 0) {
-            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments, commit_id // Pass commit_id to the function
-            );
+            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
         }
     });
 }
