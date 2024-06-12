@@ -51,7 +51,7 @@ const minimatch_1 = __importDefault(__nccwpck_require__(2002));
 const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL = core.getInput("OPENAI_API_MODEL");
-const FRAMEWORK = core.getInput("framework"); // New input for framework
+const FRAMEWORK = core.getInput("framework");
 const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
 const openai = new openai_1.default({
     apiKey: OPENAI_API_KEY,
@@ -86,23 +86,7 @@ function getDiff(owner, repo, pull_number) {
         return response.data;
     });
 }
-function getExistingComments(owner, repo, pull_number) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const commentsResponse = yield octokit.pulls.listReviewComments({
-            owner,
-            repo,
-            pull_number,
-        });
-        return commentsResponse.data
-            .filter(comment => comment.line !== undefined)
-            .map(comment => ({
-            path: comment.path,
-            line: comment.line,
-            body: comment.body,
-        }));
-    });
-}
-function analyzeCode(parsedDiff, prDetails, existingComments) {
+function analyzeCode(parsedDiff, prDetails) {
     return __awaiter(this, void 0, void 0, function* () {
         const comments = [];
         for (const file of parsedDiff) {
@@ -113,13 +97,8 @@ function analyzeCode(parsedDiff, prDetails, existingComments) {
                 const aiResponse = yield getAIResponse(prompt);
                 if (aiResponse) {
                     const newComments = createComment(file, chunk, aiResponse);
-                    for (const comment of newComments) {
-                        const duplicate = existingComments.some(existingComment => existingComment.path === comment.path &&
-                            existingComment.line === comment.line &&
-                            existingComment.body.trim() === comment.body.trim());
-                        if (!duplicate) {
-                            comments.push(comment);
-                        }
+                    if (newComments) {
+                        comments.push(...newComments);
                     }
                 }
             }
@@ -384,7 +363,7 @@ ${chunk.changes
 `;
 }
 function getAIResponse(prompt) {
-    var _a, _b, _c;
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         const queryConfig = {
             model: OPENAI_API_MODEL,
@@ -404,8 +383,16 @@ function getAIResponse(prompt) {
             // Log the raw response for debugging
             console.log('Raw response:', JSON.stringify(response, null, 2));
             const res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "";
-            // Extract JSON content from Markdown code block
-            const jsonContent = (_c = res.match(/```json([\s\S]*)```/)) === null || _c === void 0 ? void 0 : _c[1];
+            let jsonContent = null;
+            // Check if the response is in a code block
+            const codeBlockMatch = res.match(/```json([\s\S]*)```/);
+            if (codeBlockMatch) {
+                jsonContent = codeBlockMatch[1];
+            }
+            else {
+                // If not, assume the response is direct JSON
+                jsonContent = res;
+            }
             if (!jsonContent) {
                 console.error("Failed to extract JSON content from response.");
                 return null;
@@ -454,13 +441,34 @@ function createComment(file, chunk, aiResponses) {
 }
 function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
-        yield octokit.pulls.createReview({
-            owner,
-            repo,
-            pull_number,
-            comments,
-            event: "COMMENT",
-        });
+        const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
+        if (validComments.length === 0) {
+            console.log("No valid comments to add");
+            return;
+        }
+        console.log("Attempting to create review comments:", JSON.stringify(validComments, null, 2));
+        for (const comment of validComments) {
+            try {
+                yield octokit.pulls.createReview({
+                    owner,
+                    repo,
+                    pull_number,
+                    body: comment.body,
+                    path: comment.path,
+                    line: comment.line,
+                    event: 'COMMENT',
+                });
+            }
+            catch (error) {
+                console.error("Error creating review comment:", error);
+                console.log("Request data:", {
+                    owner,
+                    repo,
+                    pull_number,
+                    comment,
+                });
+            }
+        }
     });
 }
 function main() {
@@ -495,6 +503,7 @@ function main() {
             return;
         }
         const parsedDiff = (0, parse_diff_1.default)(diff);
+        console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2)); // Log parsed diff for debugging
         const excludePatterns = core
             .getInput("exclude")
             .split(",")
@@ -502,8 +511,7 @@ function main() {
         const filteredDiff = parsedDiff.filter((file) => {
             return !excludePatterns.some((pattern) => { var _a; return (0, minimatch_1.default)((_a = file.to) !== null && _a !== void 0 ? _a : "", pattern); });
         });
-        const existingComments = yield getExistingComments(prDetails.owner, prDetails.repo, prDetails.pull_number);
-        const comments = yield analyzeCode(filteredDiff, prDetails, existingComments);
+        const comments = yield analyzeCode(filteredDiff, prDetails);
         if (comments.length > 0) {
             yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
         }
