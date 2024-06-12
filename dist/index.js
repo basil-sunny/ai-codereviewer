@@ -51,7 +51,7 @@ const minimatch_1 = __importDefault(__nccwpck_require__(2002));
 const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL = core.getInput("OPENAI_API_MODEL");
-const FRAMEWORK = core.getInput("framework"); // New input for framework
+const FRAMEWORK = core.getInput("framework");
 const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
 const openai = new openai_1.default({
     apiKey: OPENAI_API_KEY,
@@ -462,12 +462,19 @@ function createComment(file, chunk, aiResponses) {
 }
 function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
+        const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
+        if (validComments.length === 0) {
+            console.log("No valid comments to add");
+            return;
+        }
         yield octokit.pulls.createReview({
             owner,
             repo,
             pull_number,
-            comments,
+            comments: validComments,
             event: "COMMENT",
+        }).catch(error => {
+            console.error("Error creating review comment:", error);
         });
     });
 }
