@@ -51,7 +51,7 @@ const minimatch_1 = __importDefault(__nccwpck_require__(2002));
 const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL = core.getInput("OPENAI_API_MODEL");
-const FRAMEWORK = core.getInput("framework");
+const FRAMEWORK = core.getInput("framework"); // New input for framework
 const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
 const openai = new openai_1.default({
     apiKey: OPENAI_API_KEY,
@@ -106,6 +106,7 @@ function analyzeCode(parsedDiff, prDetails) {
         return comments;
     });
 }
+// Function to get Ruby on Rails guidelines
 function getRailsGuidelines() {
     return `
 - Avoid Environment Specific Code:
@@ -363,7 +364,7 @@ ${chunk.changes
 `;
 }
 function getAIResponse(prompt) {
-    var _a, _b;
+    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         const queryConfig = {
             model: OPENAI_API_MODEL,
@@ -383,16 +384,8 @@ function getAIResponse(prompt) {
             // Log the raw response for debugging
             console.log('Raw response:', JSON.stringify(response, null, 2));
             const res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "";
-            let jsonContent = null;
-            // Check if the response is in a code block
-            const codeBlockMatch = res.match(/```json([\s\S]*)```/);
-            if (codeBlockMatch) {
-                jsonContent = codeBlockMatch[1];
-            }
-            else {
-                // If not, assume the response is direct JSON
-                jsonContent = res;
-            }
+            // Extract JSON content from Markdown code block
+            const jsonContent = (_c = res.match(/```json([\s\S]*)```/)) === null || _c === void 0 ? void 0 : _c[1];
             if (!jsonContent) {
                 console.error("Failed to extract JSON content from response.");
                 return null;
@@ -441,34 +434,13 @@ function createComment(file, chunk, aiResponses) {
 }
 function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
-        const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
-        if (validComments.length === 0) {
-            console.log("No valid comments to add");
-            return;
-        }
-        console.log("Attempting to create review comments:", JSON.stringify(validComments, null, 2));
-        for (const comment of validComments) {
-            try {
-                yield octokit.pulls.createReview({
-                    owner,
-                    repo,
-                    pull_number,
-                    body: comment.body,
-                    path: comment.path,
-                    line: comment.line,
-                    event: 'COMMENT',
-                });
-            }
-            catch (error) {
-                console.error("Error creating review comment:", error);
-                console.log("Request data:", {
-                    owner,
-                    repo,
-                    pull_number,
-                    comment,
-                });
-            }
-        }
+        yield octokit.pulls.createReview({
+            owner,
+            repo,
+            pull_number,
+            comments,
+            event: "COMMENT",
+        });
     });
 }
 function main() {
@@ -503,7 +475,6 @@ function main() {
             return;
         }
         const parsedDiff = (0, parse_diff_1.default)(diff);
-        console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2)); // Log parsed diff for debugging
         const excludePatterns = core
             .getInput("exclude")
             .split(",")

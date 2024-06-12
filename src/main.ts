@@ -8,7 +8,7 @@ import minimatch from "minimatch";
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
-const FRAMEWORK: string = core.getInput("framework");
+const FRAMEWORK: string = core.getInput("framework"); // New input for framework
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -79,6 +79,7 @@ async function analyzeCode(
   return comments;
 }
 
+// Function to get Ruby on Rails guidelines
 function getRailsGuidelines(): string {
   return `
 - Avoid Environment Specific Code:
@@ -368,16 +369,8 @@ async function getAIResponse(prompt: string): Promise<Array<{
 
     const res = response.choices[0].message?.content?.trim() || "";
 
-    let jsonContent: string | null = null;
-
-    // Check if the response is in a code block
-    const codeBlockMatch = res.match(/```json([\s\S]*)```/);
-    if (codeBlockMatch) {
-      jsonContent = codeBlockMatch[1];
-    } else {
-      // If not, assume the response is direct JSON
-      jsonContent = res;
-    }
+    // Extract JSON content from Markdown code block
+    const jsonContent = res.match(/```json([\s\S]*)```/)?.[1];
 
     if (!jsonContent) {
       console.error("Failed to extract JSON content from response.");
@@ -441,36 +434,13 @@ async function createReviewComment(
     pull_number: number,
     comments: Array<{ body: string; path: string; line: number }>
 ): Promise<void> {
-  const validComments = comments.filter(comment => comment.path && comment.line > 0 && comment.body.trim() !== "");
-
-  if (validComments.length === 0) {
-    console.log("No valid comments to add");
-    return;
-  }
-
-  console.log("Attempting to create review comments:", JSON.stringify(validComments, null, 2));
-
-  for (const comment of validComments) {
-    try {
-      await octokit.pulls.createReview({
-        owner,
-        repo,
-        pull_number,
-        body: comment.body,
-        path: comment.path,
-        line: comment.line,
-        event: 'COMMENT',
-      });
-    } catch (error) {
-      console.error("Error creating review comment:", error);
-      console.log("Request data:", {
-        owner,
-        repo,
-        pull_number,
-        comment,
-      });
-    }
-  }
+  await octokit.pulls.createReview({
+    owner,
+    repo,
+    pull_number,
+    comments,
+    event: "COMMENT",
+  });
 }
 
 async function main() {
@@ -512,8 +482,6 @@ async function main() {
   }
 
   const parsedDiff = parseDiff(diff);
-
-  console.log("Parsed Diff:", JSON.stringify(parsedDiff, null, 2)); // Log parsed diff for debugging
 
   const excludePatterns = core
       .getInput("exclude")
