@@ -114,16 +114,21 @@ function analyzeCode(parsedDiff, prDetails, existingComments) {
                 if (aiResponse) {
                     const newComments = createComment(file, chunk, aiResponse);
                     for (const comment of newComments) {
+                        console.log("Processing comment:", comment);
                         const duplicate = existingComments.some(existingComment => existingComment.path === comment.path &&
                             existingComment.line === comment.line &&
                             existingComment.body.trim() === comment.body.trim());
                         if (!duplicate) {
                             comments.push(comment);
                         }
+                        else {
+                            console.log("Duplicate comment found, skipping:", comment);
+                        }
                     }
                 }
             }
         }
+        console.log("Final comments to add:", JSON.stringify(comments, null, 2));
         return comments;
     });
 }
@@ -467,15 +472,26 @@ function createReviewComment(owner, repo, pull_number, comments) {
             console.log("No valid comments to add");
             return;
         }
-        yield octokit.pulls.createReview({
-            owner,
-            repo,
-            pull_number,
-            comments: validComments,
-            event: "COMMENT",
-        }).catch(error => {
+        console.log("Attempting to create review comments:", JSON.stringify(validComments, null, 2));
+        try {
+            yield octokit.pulls.createReview({
+                owner,
+                repo,
+                pull_number,
+                comments: validComments,
+                event: "COMMENT",
+            });
+        }
+        catch (error) {
             console.error("Error creating review comment:", error);
-        });
+            console.log("Request data:", {
+                owner,
+                repo,
+                pull_number,
+                comments: validComments,
+                event: "COMMENT",
+            });
+        }
     });
 }
 function main() {
