@@ -106,246 +106,126 @@ function analyzeCode(parsedDiff, prDetails) {
         return comments;
     });
 }
-// Function to get Ruby on Rails guidelines
 function getRailsGuidelines() {
     return `
-- Avoid Environment Specific Code:
-  Developer contributes the code that behaves consistently. So that code contribution is supposed to be working from every environment.
-  Example:
-  This has to be configurable value instead of hard coded with Rails environment:
-  \`\`\`ruby
-  from_address = Rails.env.production_shiji? ? 'StayNTouch@notice.shijicloud.com' : 'no-reply@stayntouch.com'
-  \`\`\`
+- **Environment Specific Code**: Avoid hard-coding values. Use configuration files or environment variables.
 
-- Legacy Code Review:
-  There is a chance to have the wrong original approach that can be implemented in the past. There are a few patterns you need to pay attention to when you contribute or review the code.
-  - Avoid Hard-coded values for configurable or has security risk into repo (e.g.: infrastructure information, credential, 3rd party vendor's token).
-  - Code contribution is supposed to be working from every environment.
-  - Unused code or canceled implementations are supposed to be cleaned up.
-  - When you find suspicious code communicate with co-developers and QA to review and make a refactoring plan.
+- **Legacy Code**: Remove hard-coded values, clean up unused code, and ensure cross-environment compatibility.
 
-- Code Style:
-  Follow the community-driven Ruby Style Guide and the complementary Rails Style Guide. Use the Rubocop gem and editor plugin to guide development within these rules.
+- **Code Quality**: Adhere to Ruby and Rails Style Guides. Use Rubocop.
 
-- Object Oriented Programming:
-  Follow the principles of this methodology, including the popular SOLID design principles:
-  - Single-responsibility principle: A class should only have a single responsibility.
-  - Open–closed principle: Software entities should be open for extension but closed for modification.
-  - Liskov substitution principle: Objects in a program should be replaceable with instances of their subtypes without altering the correctness of that program.
-  - Interface segregation principle: Many client-specific interfaces are better than one general-purpose interface.
-  - Dependency inversion principle: Depend upon abstractions, not concretions.
+- **OOP Principles**: Follow SOLID principles.
 
-- Methods:
-  Methods should be concise and are subject to ABC (assignments, branches, and conditions) metric for enforcement. Some options for reducing complexity include:
-  - Guard clauses
-  - Exit gates for conditional returns
-  - Polymorphism
-  - ConsolidateConditional refactoring of multiple branch conditions
-  - DecomposeConditional refactoring to extract boolean expressions to dedicated methods for reuse
-  - Dedicated libraries for deep decision trees with many conditions and possible responses
-  - Conditional patterns can use a Strategy pattern with a Hash of Lambdas
+- **Methods**: Keep methods concise. Use guard clauses and refactoring to reduce complexity.
 
-- Variables:
-  The purpose of a variable is to know things. Within an object, the purpose of a variable will drive what the scope should be of that variable. When defining instance level variables in a method, the purpose should be to either manipulate an already existing property of that class object or set a property. It should not be used simply to avoid passing arguments to a method within the same instance.
+- **Variables**: Use clear and descriptive names within appropriate scope.
 
-- File structure:
-  - app/: This directory holds all domain-specific code. If it applies to our business domain, it should be under this directory.
-  - lib/: This directory is for anything that is not domain-specific. Any code in this directory should be generic Ruby and not dependent on our application.
+- **File Structure**: 
+  - \`app/\`: Domain-specific code.
+  - \`lib/\`: Generic Ruby code.
 
-- Keyword Arguments vs Option Hashes:
-  Use keyword arguments instead of option hashes for better readability and maintainability.
-  Example:
-  \`\`\`ruby
-  # bad
-  def some_method(options = {})
-    bar = options.fetch(:bar, false)
-    puts bar
-  end
-  # good
-  def some_method(bar: false)
-    puts bar
-  end
-  \`\`\`
+- **Keyword Arguments**: Prefer keyword arguments for readability.
 
-- Optional argument passing:
-  A function is a block of organized, reusable code that is used to perform a single, related action. Functions provide better modularity for your application and a high degree of code reusing. The following code does not follow that principle:
-  \`\`\`ruby
-  # bad
-  def make_cc_payment(options)
-    opts = options[:opts]
-    amount = options[:amount].to_f
-    payment_method = options[:credit_card]
-    is_emv_request = options[:is_emv_request]
-    request_options = {
-      amount: amount,
-      source: self,
-      payment_method: payment_method,
-      type: is_emv_request == true ? 'sale_terminal' : 'sale',
-      checkin_date: arrival_date,
-      checkout_date: dep_date,
-      room_rate: average_rate_amount,
-      guest_name: cc_guest_name,
-      currency_code: hotel.default_currency.try(:value),
-      swiped_card: opts[:card_data],
-      workstation: options[:workstation],
-      credit_card_transaction_id: opts[:credit_card_transaction_id],
-      auth_code: options[:auth_code]
-    }
-    add_auth_and_settlement_options(options, request_options)
-    hotel.cc_payment_processor(payment_method).process(request_options)
-  end
-  \`\`\`
+- **Service Layer**: Encapsulate business logic within services.
 
-- Consistent Classes:
-  Follow a consistent structure for class definitions.
-  Example:
-  \`\`\`ruby
-  class Person
-    # extend and include go first
-    extend SomeModule
-    include AnotherModule
+- **Database Performance**: Avoid N+1 queries. Use \`includes\` or \`preload\`. Index frequently queried columns and use bulk operations.
 
-    # inner classes
-    CustomError = Class.new(StandardError)
+- **Safe Migrations**: Avoid models in migrations. Use plain SQL and commit \`structure.sql\`. Use \`LHM\` for complex migrations.
+  `;
+}
+function getAngularGuidelines() {
+    return `
+- **Component Structure**: Ensure components are small and focused on a single responsibility. Follow the Angular style guide for component structure.
 
-    # constants are next
-    SOME_CONSTANT = 20
+- **Module Organization**: Organize modules to keep related functionalities together. Use feature modules for distinct features.
 
-    # afterwards we have attribute macros
-    attr_reader :name
+- **Service Usage**: Use services for business logic and data access. Keep components focused on presentation logic.
 
-    # followed by association macros
-    belongs_to :country
-    has_many :authentications, dependent: :destroy
+- **Reactive Programming**: Prefer the use of RxJS for asynchronous operations. Ensure proper management of subscriptions to avoid memory leaks.
 
-    # and validation macros
-    validates :name
+- **Templates**: Keep templates clean and readable. Use Angular directives (\`*ngIf\`, \`*ngFor\`) appropriately.
 
-    # next we have callbacks
-    before_save :cook
-    before_save :update_username_lower
+- **Change Detection**: Optimize change detection by using \`OnPush\` strategy where possible to improve performance.
 
-    # other macros should be placed after the callbacks
-    has_enumerated :enum_attr
-    accepts_nested_attributes_for :something
+- **Forms**: Use Reactive Forms for complex forms and Template-driven forms for simpler ones. Ensure proper validation.
 
-    # scopes
-    scope :company_cards, -> { with_account_type(:COMPANY) }
+- **Routing**: Use the Angular Router for navigation. Ensure routes are organized and lazy load modules where appropriate.
 
-    # public class methods are next in line
-    def self.some_method
-    end
+- **Dependency Injection**: Use Angular's dependency injection to manage dependencies. Avoid creating instances manually.
 
-    # initialization goes between class methods and other instance methods
-    def initialize
-    end
+- **Testing**: Ensure comprehensive unit tests for components, services, and other classes. Use Jasmine and Karma for testing.
+  `;
+}
+function getAngularJSGuidelines() {
+    return `
+- **Component Structure**: Ensure components follow a single responsibility principle. Organize code using modules.
 
-    # followed by other public instance methods
-    def some_method
-    end
+- **Controller Usage**: Minimize the use of controllers. Prefer directives and services.
 
-    # protected and private methods are grouped near the end
-    protected
-    def some_protected_method
-    end
+- **Scope Management**: Avoid excessive use of \`$scope\`. Prefer using \`controllerAs\` syntax and bind properties to the controller.
 
-    private
-    def some_private_method
-    end
-  end
-  \`\`\`
+- **Service Usage**: Use services and factories for business logic. Keep controllers lean.
 
-- Service Layer:
-  The service layer should be used to store all model-related business logic for the application. No business logic should be present in the controller, job, model, or view any further. These layers should be used as follows:
-  - Controller: Accepts the request, extracts parameters, calls services, manipulates models (simple queries only), renders response.
-  - Job: Used by resque background jobs. Calls services and manipulates models.
-  - Model: Defines attributes, associations, scopes, and simple instance methods to format the data.
-  - View: Translates the model data and service output into response attributes.
-  - Service: Uses models and other services to implement business logic for a single operation.
+- **Templates**: Keep templates clean. Use directives to encapsulate reusable components.
 
-- When to Use a Service:
-  If any of the following are true:
-  - The operation relates to a domain concept that is not a natural part of an Entity or Value Object
-  - The interface is defined in terms of other elements in the domain model
-  - The operation is stateless
-  - Complex finder logic
+- **Dependency Injection**: Use AngularJS dependency injection to manage dependencies. Avoid creating instances manually.
 
-  Examples: Check In Reservation, Check Out Reservation, Create Reservation, Change Stay Dates, Make Payment, ReservationFinder, etc.
+- **Performance**: Optimize watchers and digest cycles. Use one-time bindings where possible.
 
-- When Not to Use a Service:
-  If any of the following are true:
-  - Simple one-line read/write queries via ActiveRecord
-  - Converting Controller / Job attributes to what the service needs
-  - Simple model scopes are generally better suited to store the reusable query condition
-  - Custom model methods can be used to convert an attribute
-  - View objects (serializers, jbuilder) can be used to render the controller response
-  - When the logic is a general utility and does not include any business logic, this should be a lib
+- **Testing**: Ensure comprehensive unit tests for controllers, services, and directives. Use Jasmine and Karma for testing.
+  `;
+}
+function getCypressGuidelines() {
+    return `
+- **Test Structure**: Organize tests in a logical structure. Use \`describe\` and \`it\` blocks to structure test cases.
 
-  Examples: Get reservation by id, staycard view object, sum values
+- **Selectors**: Use data attributes for selecting elements (\`data-cy\`). Avoid using selectors based on CSS or HTML structure which may change.
 
-- Migrating to a Service:
-  - Analyze the code for all entry points into the feature, including controllers, resque jobs, and sneakers jobs.
-  - Document the entry points and processes.
-  - Discuss with an architect and product owner.
-  - Implement the service.
-  - Write test cases.
-  - Move all entry points to use the service.
-  - Remove all existing duplicated code.
+- **Assertions**: Use appropriate assertions to verify application behavior. Avoid excessive assertions in a single test.
 
-- Service Conventions:
-  - Gemfile: Ensure the snt gem from the rover-common repo is included.
-  - Directory & Filename: Services should be under app/services with class names ending in Service.
-  - Calling a Service: Initialize an instance and call the "call" method.
-  - Stateless: Each service should be stateless and object-oriented.
-  - Base Class: All services must extend from SNT::Core::Services::Base.
+- **Test Data**: Use fixtures and factories for test data. Avoid hardcoding data within tests.
 
-- Logging:
-  Logs should be informative and useful, but should not be too repetitive or long. Log any important keywords that would help search for it. Choose an appropriate logging level (debug, info, warn, error, or fatal) that correctly describes the scenario at hand.
+- **Commands**: Use custom Cypress commands to reuse common test logic. 
 
-- Rake Tasks:
-  Add logger/puts to print the total time taken to run the rake task. Run the rake task in prod-test environment and update the details in the JIRA ticket.
+- **Error Handling**: Ensure tests handle errors gracefully and provide meaningful error messages.
 
-- Seeds:
-  All production-ready reference data should be inserted via seeds. Seeds should be populated during "test:prepare" rake task. Ensure that seeds do not duplicate data nor fail if data is already present.
+- **Performance**: Optimize tests to run quickly. Avoid unnecessary steps and redundant tests.
 
-- Database Performance:
-  - Avoid N+1 queries.
-  - Use the bullet gem to help identify the N+1 queries.
-  - Use the Rails ActiveRecord method includes to pre-load the associations in one query.
-  - Consolidate repetitive queries into one query by joining tables and selecting appropriate columns.
-  - Avoid full table scans by adding an index or updating the query to use an existing index.
-  - Bulk insert/update/delete many changes in a single SQL statement and avoid N+1 writes.
-  - Use the activerecord-import gem to insert many records in bulk.
-  - Batch the writes to avoid a SQL statement that is too big.
-  - Throttle batch writes with a short delay to avoid replication lag.
-  - Load test the changes with the maximum expected data.
-
-- Safe Migrations:
-  - Avoid models in migrations.
-  - Use plain SQL to avoid conflicts with changes to the model that occur after the migration was created.
-  - Use LHM to migrate certain schema changes to avoid table locking.
-  - Always commit structure.sql schema changes.
-  - Avoid looping in migrations.
-  - Use decimal(10,2) for amounts.
-  - Notify architects & release team of long migrations.
-    `;
+- **Cross-browser Testing**: Ensure tests run across different browsers to verify compatibility.
+  `;
 }
 function createPrompt(file, chunk, prDetails) {
     let guidelines = "";
     if (FRAMEWORK === "Ruby on Rails") {
         guidelines = getRailsGuidelines();
     }
-    return `Your task is to review pull requests for ${FRAMEWORK} code. Instructions:
-- Provide the response in the following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
-- Do not give positive comments or compliments.
-- Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
-- Write the comment in GitHub Markdown format.
-- Use the given description only for the overall context and only comment on the code.
-- IMPORTANT: NEVER suggest adding comments to the code.
+    else if (FRAMEWORK === "Angular") {
+        guidelines = getAngularGuidelines();
+    }
+    else if (FRAMEWORK === "AngularJS") {
+        guidelines = getAngularJSGuidelines();
+    }
+    else if (FRAMEWORK === "Cypress") {
+        guidelines = getCypressGuidelines();
+    }
+    return `Your task is to review a pull request for ${FRAMEWORK} code. Follow these instructions:
+
+- Provide your response in JSON format: {"reviews": [{"lineNumber": <line_number>, "reviewComment": "<review comment>", "optimizedCode": "<optimized code>"}]}
+- Comment only where there is an issue or a suggestion for improvement. No positive comments.
+- Use GitHub Markdown format for comments.
+- For each issue or suggestion, provide the optimized code snippet.
+- Identify specific types of issues:
+  - **Security**: Look for vulnerabilities such as SQL injection, XSS, and insecure configurations.
+  - **Performance**: Identify potential performance bottlenecks and suggest optimizations.
+  - **Maintainability**: Ensure the code is easy to read and maintain. Suggest refactoring if necessary.
+  - **Best Practices**: Ensure adherence to best practices specific to ${FRAMEWORK} and the overall project.
+  - **Testing**: Verify that the code changes include appropriate tests. If not, suggest adding tests.
+  - **Documentation**: Check if the code changes are well-documented. If not, suggest improvements in documentation.
+
 ${guidelines}
 
-Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
-  
+Review the following code diff in the file "${file.to}", considering the pull request title and description for context:
+
 Pull request title: ${prDetails.title}
 Pull request description:
 
@@ -426,7 +306,7 @@ function createComment(file, chunk, aiResponses) {
         }
         const commentLine = "ln" in change ? change.ln : "ln2" in change ? change.ln2 : 0;
         return {
-            body: aiResponse.reviewComment,
+            body: `${aiResponse.reviewComment}\n\n**Optimized Code:**\n\`\`\`${FRAMEWORK === 'Ruby on Rails' ? 'ruby' : FRAMEWORK === 'Cypress' ? 'javascript' : 'typescript'}\n${aiResponse.optimizedCode}\n\`\`\``,
             path: file.to,
             line: commentLine,
         };
