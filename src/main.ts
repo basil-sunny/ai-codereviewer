@@ -171,6 +171,14 @@ function getCypressGuidelines(): string {
   `;
 }
 
+function getTerraformGuidelines(): string {
+  return `
+- **Avoid duplicate review comments**: If the same comment applies to multiple lines within the same file or across different files, consolidate your feedback and leave a single comment. Reference the relevant line numbers and files where the changes are needed.
+- **Ignore reviewing commentlines**: Ignore reviewing newly added or edited commentlines in the code.
+- **Ignore reviewing boolean variables**: Ignore reviewing boolean values in environment YAML config files.
+`;
+}
+
 function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
   let guidelines = "";
 
@@ -182,6 +190,8 @@ function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
     guidelines = getAngularJSGuidelines();
   } else if (FRAMEWORK === "Cypress") {
     guidelines = getCypressGuidelines();
+  } else if (FRAMEWORK === "Terraform") {
+    guidelines = getTerraformGuidelines();
   }
 
   return `Your task is to review a pull request for ${FRAMEWORK} code. Follow these instructions:
