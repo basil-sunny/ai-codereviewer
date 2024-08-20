@@ -174,13 +174,21 @@ function getCypressGuidelines(): string {
 function getTerraformGuidelines(): string {
   return `
 - **Security**: Avoid hardcoding sensitive information.
+
 - **Performance**: Optimize resource usage and state management.
+
 - **Maintainability**: Ensure the code is easy to read and maintain. Suggest refactoring if necessary.
+
 - **Best Practices**: Follow Terraform best practices for resource management, state handling, and code organization.
+
 - **Testing**: Verify that the code changes include appropriate tests. If not, suggest adding tests.
+
 - **Documentation**: Check if the code changes are well-documented. If not, suggest improvements in documentation.
+
 - **Modules**: Use modules to encapsulate and reuse code.
+
 - **State Management**: Use remote state storage for shared environments.
+
 - **Version Control**: Pin provider versions to avoid unexpected changes.
   `;
 }
