@@ -194,6 +194,19 @@ function getCypressGuidelines() {
 - **Cross-browser Testing**: Ensure tests run across different browsers to verify compatibility.
   `;
 }
+function getTerraformGuidelines() {
+    return `
+- **Security**: Avoid hardcoding sensitive information.
+- **Performance**: Optimize resource usage and state management.
+- **Maintainability**: Ensure the code is easy to read and maintain. Suggest refactoring if necessary.
+- **Best Practices**: Follow Terraform best practices for resource management, state handling, and code organization.
+- **Testing**: Verify that the code changes include appropriate tests. If not, suggest adding tests.
+- **Documentation**: Check if the code changes are well-documented. If not, suggest improvements in documentation.
+- **Modules**: Use modules to encapsulate and reuse code.
+- **State Management**: Use remote state storage for shared environments.
+- **Version Control**: Pin provider versions to avoid unexpected changes.
+  `;
+}
 function createPrompt(file, chunk, prDetails) {
     let guidelines = "";
     if (FRAMEWORK === "Ruby on Rails") {
@@ -208,19 +221,17 @@ function createPrompt(file, chunk, prDetails) {
     else if (FRAMEWORK === "Cypress") {
         guidelines = getCypressGuidelines();
     }
+    else if (FRAMEWORK === "Terraform") {
+        guidelines = getTerraformGuidelines();
+    }
     return `Your task is to review a pull request for ${FRAMEWORK} code. Follow these instructions:
 
 - Provide your response in JSON format: {"reviews": [{"lineNumber": <line_number>, "reviewComment": "<review comment>", "optimizedCode": "<optimized code>"}]}
 - Comment only where there is an issue or a suggestion for improvement. No positive comments.
 - Use GitHub Markdown format for comments.
 - For each issue or suggestion, provide the optimized code snippet.
-- Identify specific types of issues:
-  - **Security**: Look for vulnerabilities such as SQL injection, XSS, and insecure configurations.
-  - **Performance**: Identify potential performance bottlenecks and suggest optimizations.
-  - **Maintainability**: Ensure the code is easy to read and maintain. Suggest refactoring if necessary.
-  - **Best Practices**: Ensure adherence to best practices specific to ${FRAMEWORK} and the overall project.
-  - **Testing**: Verify that the code changes include appropriate tests. If not, suggest adding tests.
-  - **Documentation**: Check if the code changes are well-documented. If not, suggest improvements in documentation.
+- Limit each review comment to 280 characters.
+- Limit to only 10 issues or suggestions with high severity all together.
 
 ${guidelines}
 
@@ -306,7 +317,7 @@ function createComment(file, chunk, aiResponses) {
         }
         const commentLine = "ln" in change ? change.ln : "ln2" in change ? change.ln2 : 0;
         return {
-            body: `${aiResponse.reviewComment}\n\n**Optimized Code:**\n\`\`\`${FRAMEWORK === 'Ruby on Rails' ? 'ruby' : FRAMEWORK === 'Cypress' ? 'javascript' : 'typescript'}\n${aiResponse.optimizedCode}\n\`\`\``,
+            body: `${aiResponse.reviewComment}\n\n**Optimized Code:**\n\`\`\`${FRAMEWORK === 'Ruby on Rails' ? 'ruby' : FRAMEWORK === 'Cypress' ? 'javascript' : FRAMEWORK === 'Terraform' ? 'hcl' : 'typescript'}\n${aiResponse.optimizedCode}\n\`\`\``,
             path: file.to,
             line: commentLine,
         };
