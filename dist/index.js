@@ -230,6 +230,8 @@ function createPrompt(file, chunk, prDetails) {
 - Comment only where there is an issue or a suggestion for improvement. No positive comments.
 - Use GitHub Markdown format for comments.
 - For each issue or suggestion, provide the optimized code snippet.
+- Limit each review comment to 280 characters.
+- Limit to only 10 issues or suggestions with high severity all together.
 
 ${guidelines}
 
